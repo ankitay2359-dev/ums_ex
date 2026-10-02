@@ -1,0 +1,369 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Udhaar Management System{% endblock %}
+{% block page_title %}Shop Overview Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Top Financial Summary Cards -->
+    <div class="stats-grid">
+        <!-- Total Customers Card -->
+        <div class="stat-card card-blue">
+            <div class="stat-icon-bg">👥</div>
+            <div class="stat-info">
+                <span class="stat-label">Total Customers</span>
+                <h3 class="stat-value">{{ stats.total_customers }}</h3>
+                <span class="stat-sub">Registered shop clients</span>
+            </div>
+            <a href="{{ url_for('customers') }}" class="stat-link" title="View all customers">View &rarr;</a>
+        </div>
+
+        <!-- Total Udhaar (Credit) Card -->
+        <div class="stat-card card-red">
+            <div class="stat-icon-bg">💰</div>
+            <div class="stat-info">
+                <span class="stat-label">Total Udhaar Given</span>
+                <h3 class="stat-value">₹{{ "{:,.2f}".format(stats.total_udhaar) }}</h3>
+                <span class="stat-sub">All-time credit issued</span>
+            </div>
+            <a href="{{ url_for('udhaar') }}" class="stat-link" title="Record credit">Record &rarr;</a>
+        </div>
+
+        <!-- Total Paid Card -->
+        <div class="stat-card card-green">
+            <div class="stat-icon-bg">💵</div>
+            <div class="stat-info">
+                <span class="stat-label">Total Payments Received</span>
+                <h3 class="stat-value">₹{{ "{:,.2f}".format(stats.total_paid) }}</h3>
+                <span class="stat-sub">Recovered cash / UPI</span>
+            </div>
+            <a href="{{ url_for('payments') }}" class="stat-link" title="Record payment">Record &rarr;</a>
+        </div>
+
+        <!-- Net Remaining Balance Card -->
+        <div class="stat-card card-purple">
+            <div class="stat-icon-bg">⚖️</div>
+            <div class="stat-info">
+                <span class="stat-label">Total Outstanding Market Balance</span>
+                <h3 class="stat-value {% if stats.total_remaining > 0 %}text-danger{% endif %}">₹{{ "{:,.2f}".format(stats.total_remaining) }}</h3>
+                <span class="stat-sub">Udhaar minus payments</span>
+            </div>
+            <a href="{{ url_for('pending_customers') }}" class="stat-link" title="View pending">Track &rarr;</a>
+        </div>
+    </div>
+
+    <!-- Secondary Indicator Badges -->
+    <div class="secondary-metrics-bar">
+        <div class="metric-chip chip-warning">
+            <span class="chip-icon">⏳</span>
+            <span class="chip-text"><b>{{ stats.pending_customers_count }}</b> Customers with Pending Balance</span>
+            <a href="{{ url_for('pending_customers') }}" class="chip-action">View List</a>
+        </div>
+        <div class="metric-chip chip-danger">
+            <span class="chip-icon">🚨</span>
+            <span class="chip-text"><b>{{ stats.overdue_count }}</b> Accounts with Overdue Dates</span>
+            <a href="{{ url_for('pending_customers') }}" class="chip-action">Check Due</a>
+        </div>
+        <div class="metric-chip chip-info">
+            <span class="chip-icon">📅</span>
+            <span class="chip-text"><b>{{ stats.today_transactions_count }}</b> Transactions Recorded Today</span>
+            <a href="{{ url_for('reports') }}" class="chip-action">Daily Report</a>
+        </div>
+        <div class="metric-chip chip-sparkle">
+            <span class="chip-icon">🤖</span>
+            <span class="chip-text">AI Shop Assistant Ready</span>
+            <a href="{{ url_for('ai_assistant') }}" class="chip-action">Ask AI</a>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="charts-row">
+        <!-- Bar Chart: Udhaar vs Payments Monthly Trend -->
+        <div class="card chart-card">
+            <div class="card-header">
+                <h3 class="card-title">📈 Monthly Udhaar vs Payments (Last 6 Months)</h3>
+                <span class="badge badge-light">From MySQL Records</span>
+            </div>
+            <div class="card-body">
+                <div class="custom-chart-container" id="monthlyTrendsChartContainer">
+                    <canvas id="monthlyTrendCanvas" width="600" height="260"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Doughnut / Ratio Chart: Credit Status Ratio -->
+        <div class="card chart-card-compact">
+            <div class="card-header">
+                <h3 class="card-title">🥧 Recovery vs Balance</h3>
+            </div>
+            <div class="card-body flex-center-column">
+                <div class="recovery-radial-wrap">
+                    <div class="recovery-stat-ring">
+                        <canvas id="ratioDoughnutCanvas" width="180" height="180"></canvas>
+                    </div>
+                    <div class="ratio-breakdown">
+                        <div class="legend-item">
+                            <span class="legend-dot dot-green"></span>
+                            <span>Collected: <b>₹{{ "{:,.2f}".format(stats.total_paid) }}</b></span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot dot-red"></span>
+                            <span>Remaining: <b>₹{{ "{:,.2f}".format(stats.total_remaining) }}</b></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Transactions Row -->
+    <div class="tables-grid">
+        <!-- Recent Udhaar Given -->
+        <div class="card">
+            <div class="card-header flex-between">
+                <div>
+                    <h3 class="card-title">💰 Recent Udhaar Given</h3>
+                    <span class="card-subtitle">Last 5 credit transactions</span>
+                </div>
+                <a href="{{ url_for('udhaar') }}" class="btn btn-sm btn-outline">+ Add Udhaar</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th>Product</th>
+                                <th>Qty</th>
+                                <th class="text-right">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if stats.recent_udhaar %}
+                                {% for u in stats.recent_udhaar %}
+                                <tr>
+                                    <td>{{ u.udhaar_date }}</td>
+                                    <td>
+                                        <a href="{{ url_for('customer_details', customer_id=u.customer_id) }}" class="customer-link">
+                                            <b>{{ u.customer_name }}</b>
+                                            <span class="sub-id">#{{ u.customer_id }}</span>
+                                        </a>
+                                    </td>
+                                    <td>{{ u.product_name }}</td>
+                                    <td><span class="badge badge-light">{{ u.quantity }}</span></td>
+                                    <td class="text-right text-bold text-danger">₹{{ "{:,.2f}".format(u.amount) }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">No recent Udhaar records found.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Payments Received -->
+        <div class="card">
+            <div class="card-header flex-between">
+                <div>
+                    <h3 class="card-title">💵 Recent Payments Received</h3>
+                    <span class="card-subtitle">Last 5 payment settlements</span>
+                </div>
+                <a href="{{ url_for('payments') }}" class="btn btn-sm btn-outline">+ Record Payment</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th>Mode</th>
+                                <th class="text-right">Amount Paid</th>
+                                <th class="text-center">Receipt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if stats.recent_payments %}
+                                {% for p in stats.recent_payments %}
+                                <tr>
+                                    <td>{{ p.payment_date }}</td>
+                                    <td>
+                                        <a href="{{ url_for('customer_details', customer_id=p.customer_id) }}" class="customer-link">
+                                            <b>{{ p.customer_name }}</b>
+                                            <span class="sub-id">#{{ p.customer_id }}</span>
+                                        </a>
+                                    </td>
+                                    <td><span class="badge badge-primary">{{ p.payment_method }}</span></td>
+                                    <td class="text-right text-bold text-success">₹{{ "{:,.2f}".format(p.amount_paid) }}</td>
+                                    <td class="text-center">
+                                        <a href="{{ url_for('payment_receipt_pdf', payment_id=p.payment_id) }}" class="btn btn-xs btn-outline" title="Download Receipt PDF">
+                                            🧾 PDF
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">No recent payments recorded.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Embedded trend data for Vanilla JS Canvas Charts -->
+<script id="chartDataScript" type="application/json">
+    {{ monthly_data|tojson }}
+</script>
+<script id="totalsDataScript" type="application/json">
+    {
+        "total_udhaar": {{ stats.total_udhaar }},
+        "total_paid": {{ stats.total_paid }},
+        "total_remaining": {{ stats.total_remaining }}
+    }
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Draw vanilla HTML5 canvas charts
+        try {
+            const chartData = JSON.parse(document.getElementById('chartDataScript').textContent);
+            const totals = JSON.parse(document.getElementById('totalsDataScript').textContent);
+
+            // 1. Draw Monthly Trend Bar Chart
+            const trendCanvas = document.getElementById('monthlyTrendCanvas');
+            if (trendCanvas && chartData.months && chartData.months.length > 0) {
+                drawTrendChart(trendCanvas, chartData);
+            }
+
+            // 2. Draw Ratio Doughnut Chart
+            const doughnutCanvas = document.getElementById('ratioDoughnutCanvas');
+            if (doughnutCanvas) {
+                drawRatioDoughnut(doughnutCanvas, totals.total_paid, totals.total_remaining);
+            }
+        } catch (e) {
+            console.error("Error drawing dashboard charts:", e);
+        }
+    });
+
+    function drawTrendChart(canvas, data) {
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        ctx.clearRect(0, 0, width, height);
+
+        const padLeft = 60, padRight = 30, padTop = 30, padBottom = 40;
+        const chartW = width - padLeft - padRight;
+        const chartH = height - padTop - padBottom;
+
+        const maxVal = Math.max(...data.udhaar, ...data.payments, 1000) * 1.15;
+        const count = data.months.length;
+        const groupW = chartW / count;
+        const barW = Math.max(14, groupW * 0.28);
+
+        // Draw horizontal grid lines
+        ctx.strokeStyle = '#E2E8F0';
+        ctx.lineWidth = 1;
+        ctx.font = '11px Inter, sans-serif';
+        ctx.fillStyle = '#64748B';
+        ctx.textAlign = 'right';
+
+        for (let i = 0; i <= 4; i++) {
+            const y = padTop + chartH - (i / 4) * chartH;
+            const val = Math.round((i / 4) * maxVal);
+            ctx.beginPath();
+            ctx.moveTo(padLeft, y);
+            ctx.lineTo(width - padRight, y);
+            ctx.stroke();
+            ctx.fillText('₹' + val.toLocaleString('en-IN'), padLeft - 8, y + 4);
+        }
+
+        // Draw Bars
+        data.months.forEach((month, idx) => {
+            const groupX = padLeft + idx * groupW + groupW / 2;
+
+            // Udhaar Bar (Red)
+            const uVal = data.udhaar[idx];
+            const uH = (uVal / maxVal) * chartH;
+            const uX = groupX - barW - 2;
+            const uY = padTop + chartH - uH;
+            ctx.fillStyle = '#EF4444';
+            ctx.fillRect(uX, uY, barW, uH);
+
+            // Payment Bar (Green)
+            const pVal = data.payments[idx];
+            const pH = (pVal / maxVal) * chartH;
+            const pX = groupX + 2;
+            const pY = padTop + chartH - pH;
+            ctx.fillStyle = '#10B981';
+            ctx.fillRect(pX, pY, barW, pH);
+
+            // Month Label
+            ctx.fillStyle = '#1E293B';
+            ctx.textAlign = 'center';
+            ctx.fillText(month, groupX, height - 12);
+        });
+
+        // Chart Legend
+        ctx.fillStyle = '#EF4444';
+        ctx.fillRect(padLeft + 10, 10, 12, 12);
+        ctx.fillStyle = '#1E293B';
+        ctx.textAlign = 'left';
+        ctx.fillText('Udhaar Given', padLeft + 28, 20);
+
+        ctx.fillStyle = '#10B981';
+        ctx.fillRect(padLeft + 140, 10, 12, 12);
+        ctx.fillText('Payments Received', padLeft + 158, 20);
+    }
+
+    function drawRatioDoughnut(canvas, paid, remaining) {
+        const ctx = canvas.getContext('2d');
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const radius = 70;
+        const innerRadius = 45;
+        const total = (paid + remaining) || 1;
+
+        const paidAngle = (paid / total) * (2 * Math.PI);
+        const remAngle = (remaining / total) * (2 * Math.PI);
+
+        // Paid slice (Green)
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, -Math.PI / 2, -Math.PI / 2 + paidAngle);
+        ctx.arc(cx, cy, innerRadius, -Math.PI / 2 + paidAngle, -Math.PI / 2, true);
+        ctx.closePath();
+        ctx.fillStyle = '#10B981';
+        ctx.fill();
+
+        // Remaining slice (Red)
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, -Math.PI / 2 + paidAngle, -Math.PI / 2 + paidAngle + remAngle);
+        ctx.arc(cx, cy, innerRadius, -Math.PI / 2 + paidAngle + remAngle, -Math.PI / 2 + paidAngle, true);
+        ctx.closePath();
+        ctx.fillStyle = '#EF4444';
+        ctx.fill();
+
+        // Center Text (% collected)
+        const pct = Math.round((paid / total) * 100);
+        ctx.fillStyle = '#1E293B';
+        ctx.font = 'bold 18px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(pct + '%', cx, cy - 6);
+        ctx.font = '10px Inter, sans-serif';
+        ctx.fillStyle = '#64748B';
+        ctx.fillText('Recovered', cx, cy + 12);
+    }
+</script>
+{% endblock %}

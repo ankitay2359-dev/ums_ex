@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+
+{% block title %}Record Payment - Udhaar Management System{% endblock %}
+{% block page_title %}Record Customer Payment{% endblock %}
+
+{% block content %}
+<div class="form-page-layout">
+    <!-- Receipt Available Banner if redirected after payment -->
+    {% if receipt_id %}
+    <div class="receipt-success-banner mb-4">
+        <div class="banner-icon">🧾</div>
+        <div class="banner-text">
+            <h4>Payment Recorded Successfully! Receipt #{{ receipt_id }} Generated</h4>
+            <p>You can print or download the official PDF receipt for your customer right now.</p>
+        </div>
+        <div class="banner-action">
+            <a href="{{ url_for('payment_receipt_pdf', payment_id=receipt_id) }}" class="btn btn-light btn-lg" target="_blank">
+                📥 Download PDF Receipt
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Left Column: Record Payment Form -->
+    <div class="form-column">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">💵 New Payment Receipt Entry</h3>
+                <span class="card-subtitle">Receive cash, UPI, or bank payment from a customer</span>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('payments') }}" method="POST" id="paymentForm" onsubmit="return validatePaymentForm()">
+                    <!-- Customer Selector -->
+                    <div class="form-group">
+                        <label for="pay_customer_id" class="form-label">Select Customer <span class="text-danger">*</span></label>
+                        <select name="customer_id" id="pay_customer_id" class="form-control" required onchange="onPaymentCustomerChange(this)">
+                            <option value="">-- Choose Customer to Receive Payment --</option>
+                            {% for c in customers %}
+                            <option value="{{ c.customer_id }}" {% if selected_cid == c.customer_id %}selected{% endif %}
+                                    data-balance="{{ c.balance }}">
+                                #{{ c.customer_id }} &mdash; {{ c.customer_name }} {% if c.mobile %}({{ c.mobile }}){% endif %} - Outstanding: ₹{{ "{:,.2f}".format(c.balance) }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div id="paymentCustomerBalanceDisplay" class="balance-preview-box" style="display: none;">
+                            <span class="prev-label">Current Outstanding Udhaar:</span>
+                            <span class="prev-val text-danger" id="spanCustBalance">₹0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Amount Paid -->
+                    <div class="form-group">
+                        <label for="amount_paid" class="form-label">Amount Received (₹) <span class="text-danger">*</span></label>
+                        <div class="input-wrapper">
+                            <span class="input-currency">₹</span>
+                            <input type="number" step="0.01" min="1" name="amount_paid" id="amount_paid" class="form-control form-control-lg" 
+                                   placeholder="0.00" required oninput="calculateProjectedBalance()">
+                        </div>
+                        <div id="projectedBalanceDiv" class="projected-balance-text" style="display: none;">
+                            Projected remaining balance after this payment: <b id="projectedBalanceVal">₹0.00</b>
+                        </div>
+                    </div>
+
+                    <!-- Date & Payment Method Row -->
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="payment_date" class="form-label">Payment Date <span class="text-danger">*</span></label>
+                            <input type="date" name="payment_date" id="payment_date" class="form-control" required>
+                        </div>
+
+                        <div class="form-group col-md-6">
+                            <label for="payment_method" class="form-label">Payment Mode <span class="text-danger">*</span></label>
+                            <select name="payment_method" id="payment_method" class="form-control" required>
+                                <option value="Cash" selected>💵 Cash</option>
+                                <option value="UPI">📱 UPI (GPay, PhonePe, Paytm)</option>
+                                <option value="Card">💳 Debit / Credit Card</option>
+                                <option value="Bank Transfer">🏦 Direct Bank Transfer / NEFT</option>
+                                <option value="Cheque">📜 Cheque</option>
+                                <option value="Other">🏷️ Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="form-group">
+                        <label for="pay_notes" class="form-label">Payment Notes / Transaction Ref</label>
+                        <textarea name="notes" id="pay_notes" class="form-control" rows="2" placeholder="e.g. UPI Ref #12345678, Received via GPay, instalment 1 of 2"></textarea>
+                    </div>
+
+                    <!-- Submit Actions -->
+                    <div class="form-actions mt-4">
+                        <button type="submit" class="btn btn-success btn-lg btn-block">
+                            ✅ Record Payment & Generate Receipt
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Recent Payments Received -->
+    <div class="table-column">
+        <div class="card">
+            <div class="card-header flex-between">
+                <h3 class="card-title">Recent Payments Received</h3>
+                <span class="text-muted text-sm">Last 15 payments</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th>Mode</th>
+                                <th class="text-right">Amount</th>
+                                <th class="text-center">Receipt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if recent %}
+                                {% for r in recent %}
+                                <tr>
+                                    <td><small>{{ r.payment_date }}</small></td>
+                                    <td>
+                                        <a href="{{ url_for('customer_details', customer_id=r.customer_id) }}" class="customer-link">
+                                            <b>{{ r.customer_name }}</b>
+                                            <span class="sub-id">#{{ r.customer_id }}</span>
+                                        </a>
+                                    </td>
+                                    <td><span class="badge badge-primary">{{ r.payment_method }}</span></td>
+                                    <td class="text-right text-bold text-success">₹{{ "{:,.2f}".format(r.amount_paid) }}</td>
+                                    <td class="text-center">
+                                        <a href="{{ url_for('payment_receipt_pdf', payment_id=r.payment_id) }}" class="btn btn-xs btn-outline" title="Download Receipt PDF">
+                                            🧾 PDF
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">No payments recorded yet.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/payments.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const dateInput = document.getElementById('payment_date');
+        if (dateInput && !dateInput.value) {
+            dateInput.value = new Date().toISOString().split('T')[0];
+        }
+        const select = document.getElementById('pay_customer_id');
+        if (select && select.value) {
+            onPaymentCustomerChange(select);
+        }
+    });
+
+    let currentSelectedBalance = 0;
+
+    function onPaymentCustomerChange(select) {
+        const option = select.options[select.selectedIndex];
+        const displayDiv = document.getElementById('paymentCustomerBalanceDisplay');
+        const spanBal = document.getElementById('spanCustBalance');
+
+        if (option && option.value) {
+            currentSelectedBalance = parseFloat(option.getAttribute('data-balance') || 0);
+            spanBal.textContent = '₹' + currentSelectedBalance.toLocaleString('en-IN', {minimumFractionDigits: 2});
+            displayDiv.style.display = 'flex';
+            calculateProjectedBalance();
+        } else {
+            currentSelectedBalance = 0;
+            displayDiv.style.display = 'none';
+            document.getElementById('projectedBalanceDiv').style.display = 'none';
+        }
+    }
+
+    function calculateProjectedBalance() {
+        const amtInput = document.getElementById('amount_paid');
+        const projDiv = document.getElementById('projectedBalanceDiv');
+        const projVal = document.getElementById('projectedBalanceVal');
+        const amt = parseFloat(amtInput.value) || 0;
+
+        if (amt > 0 && currentSelectedBalance > 0) {
+            const projected = currentSelectedBalance - amt;
+            projDiv.style.display = 'block';
+            projVal.textContent = '₹' + projected.toLocaleString('en-IN', {minimumFractionDigits: 2});
+            if (projected <= 0) {
+                projVal.className = 'text-success font-bold';
+            } else {
+                projVal.className = 'text-warning font-bold';
+            }
+        } else {
+            projDiv.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}

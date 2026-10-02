@@ -1,0 +1,357 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ data.customer.customer_name }} (#{{ data.customer.customer_id }}) - Udhaar Management{% endblock %}
+{% block page_title %}Customer Profile & Ledger{% endblock %}
+
+{% block content %}
+<div class="customer-details-page">
+    <!-- Profile & Header Summary Card -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="customer-profile-header">
+                <div class="profile-left">
+                    <div class="profile-avatar-circle">
+                        {{ data.customer.customer_name[0]|upper }}
+                    </div>
+                    <div class="profile-info">
+                        <div class="flex-align-center gap-2">
+                            <h2 class="customer-title-name">{{ data.customer.customer_name }}</h2>
+                            <span class="badge badge-dark">Customer ID #{{ data.customer.customer_id }}</span>
+                        </div>
+                        <div class="profile-meta-row">
+                            <span>📞 <b>Mobile:</b> {{ data.customer.mobile or 'Not registered' }}</span>
+                            <span>📍 <b>Address:</b> {{ data.customer.address or 'No address on file' }}</span>
+                            <span>📅 <b>Customer Since:</b> {{ data.customer.registration_date }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-actions-bar">
+                    <a href="{{ url_for('customer_statement_pdf', customer_id=data.customer.customer_id) }}" class="btn btn-outline" target="_blank" title="Download Official Statement PDF">
+                        📄 Download PDF
+                    </a>
+                    <a href="{{ url_for('customer_statement', customer_id=data.customer.customer_id) }}" class="btn btn-secondary" target="_blank" title="Open Printable Statement">
+                        🖨️ Print Statement
+                    </a>
+                    <button type="button" class="btn btn-sparkle" onclick="generateAiCustomerSummary({{ data.customer.customer_id }})">
+                        🤖 AI Summary
+                    </button>
+                    <button type="button" class="btn btn-warning-outline" onclick="openReminderModal({{ data.customer.customer_id }}, '{{ data.customer.customer_name|escape }}', {{ data.remaining_balance }}, '{{ data.customer.mobile or '' }}')">
+                        💬 Generate Reminder
+                    </button>
+                    <a href="{{ url_for('udhaar', customer_id=data.customer.customer_id) }}" class="btn btn-primary">
+                        + Add Udhaar
+                    </a>
+                    <a href="{{ url_for('payments', customer_id=data.customer.customer_id) }}" class="btn btn-success">
+                        + Record Payment
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Balance Metric Cards -->
+    <div class="stats-grid mb-4">
+        <div class="stat-card card-red">
+            <div class="stat-icon-bg">💰</div>
+            <div class="stat-info">
+                <span class="stat-label">Total Udhaar Taken</span>
+                <h3 class="stat-value">₹{{ "{:,.2f}".format(data.total_udhaar) }}</h3>
+                <span class="stat-sub">{{ data.udhaar_records|length }} credit transaction(s)</span>
+            </div>
+        </div>
+
+        <div class="stat-card card-green">
+            <div class="stat-icon-bg">💵</div>
+            <div class="stat-info">
+                <span class="stat-label">Total Amount Paid</span>
+                <h3 class="stat-value">₹{{ "{:,.2f}".format(data.total_paid) }}</h3>
+                <span class="stat-sub">{{ data.payment_records|length }} payment instalment(s)</span>
+            </div>
+        </div>
+
+        <div class="stat-card {% if data.remaining_balance > 0 %}card-purple{% elif data.remaining_balance == 0 %}card-green{% else %}card-blue{% endif %}">
+            <div class="stat-icon-bg">⚖️</div>
+            <div class="stat-info">
+                <span class="stat-label">Remaining Outstanding Balance</span>
+                <h3 class="stat-value {% if data.remaining_balance > 0 %}text-danger{% elif data.remaining_balance == 0 %}text-success{% else %}text-primary{% endif %}">
+                    ₹{{ "{:,.2f}".format(data.remaining_balance) }}
+                </h3>
+                <span class="stat-sub">
+                    {% if data.remaining_balance > 0 %}
+                    Payment pending
+                    {% elif data.remaining_balance == 0 %}
+                    Account fully settled ✓
+                    {% else %}
+                    Advance deposit available
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Customer Summary Box (Dynamically Populated) -->
+    <div class="card mb-4 ai-insight-card" id="aiSummaryCard" style="display: none;">
+        <div class="card-header flex-between">
+            <h3 class="card-title">🤖 AI Financial Overview & Insight</h3>
+            <button class="btn btn-xs btn-outline" onclick="document.getElementById('aiSummaryCard').style.display='none'">&times; Close</button>
+        </div>
+        <div class="card-body">
+            <div id="aiSummaryLoader" class="text-center py-3">
+                <span class="spinner"></span> Generating AI balance analysis from MySQL records...
+            </div>
+            <div id="aiSummaryContent" class="ai-text-output" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Udhaar History Table -->
+    <div class="card mb-4">
+        <div class="card-header flex-between">
+            <div>
+                <h3 class="card-title">💰 Udhaar (Credit) History</h3>
+                <span class="card-subtitle">All products taken on credit</span>
+            </div>
+            <a href="{{ url_for('udhaar', customer_id=data.customer.customer_id) }}" class="btn btn-sm btn-primary-outline">+ New Udhaar</a>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th style="width: 70px;">ID</th>
+                            <th>Date</th>
+                            <th>Product Description</th>
+                            <th>Quantity</th>
+                            <th>Due Date</th>
+                            <th>Notes</th>
+                            <th class="text-right">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if data.udhaar_records %}
+                            {% for u in data.udhaar_records %}
+                            <tr>
+                                <td><span class="badge badge-light">#{{ u.udhaar_id }}</span></td>
+                                <td>{{ u.udhaar_date }}</td>
+                                <td><b>{{ u.product_name }}</b></td>
+                                <td><span class="badge badge-light">{{ u.quantity }}</span></td>
+                                <td>
+                                    {% if u.due_date %}
+                                    <span class="date-badge">{{ u.due_date }}</span>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td><small class="text-muted">{{ u.notes or '-' }}</small></td>
+                                <td class="text-right text-bold text-danger">₹{{ "{:,.2f}".format(u.amount) }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">No Udhaar credit records on file for this customer.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment History Table -->
+    <div class="card mb-4">
+        <div class="card-header flex-between">
+            <div>
+                <h3 class="card-title">💵 Payment History</h3>
+                <span class="card-subtitle">All separate payment records received</span>
+            </div>
+            <a href="{{ url_for('payments', customer_id=data.customer.customer_id) }}" class="btn btn-sm btn-success-outline">+ Record Payment</a>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th style="width: 70px;">ID</th>
+                            <th>Payment Date</th>
+                            <th>Payment Method</th>
+                            <th>Notes</th>
+                            <th class="text-right">Amount Paid</th>
+                            <th class="text-center" style="width: 120px;">Receipt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if data.payment_records %}
+                            {% for p in data.payment_records %}
+                            <tr>
+                                <td><span class="badge badge-light">#{{ p.payment_id }}</span></td>
+                                <td>{{ p.payment_date }}</td>
+                                <td><span class="badge badge-primary">{{ p.payment_method }}</span></td>
+                                <td><small class="text-muted">{{ p.notes or '-' }}</small></td>
+                                <td class="text-right text-bold text-success">₹{{ "{:,.2f}".format(p.amount_paid) }}</td>
+                                <td class="text-center">
+                                    <a href="{{ url_for('payment_receipt_pdf', payment_id=p.payment_id) }}" class="btn btn-xs btn-outline" title="Download Receipt PDF">
+                                        🧾 PDF Receipt
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">No payments recorded yet.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: AI Reminder Generator -->
+<div class="modal-overlay" id="reminderModal" style="display: none;">
+    <div class="modal-box modal-lg">
+        <div class="modal-header">
+            <h3 class="modal-title">💬 AI Payment Reminder Generator</h3>
+            <button class="modal-close" onclick="closeReminderModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="reminder-meta mb-3">
+                <span><b>Customer:</b> <span id="remCustName"></span> (ID #<span id="remCustId"></span>)</span>
+                <span><b>Balance Owed:</b> <span class="text-danger font-bold">₹<span id="remCustBalance"></span></span></span>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Reminder Tone</label>
+                <div class="tone-selector">
+                    <label class="radio-label">
+                        <input type="radio" name="remTone" value="polite" checked onchange="regenerateReminder()">
+                        <span>Polite & Friendly</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="remTone" value="formal" onchange="regenerateReminder()">
+                        <span>Formal Business</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="remTone" value="firm" onchange="regenerateReminder()">
+                        <span>Firm (Overdue)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="flex-between mb-1">
+                    <label class="form-label mb-0">Generated Reminder Message (Editable)</label>
+                    <small class="text-muted">You can edit this message before copying or sending</small>
+                </div>
+                <div id="remLoader" class="text-center py-4">
+                    <span class="spinner"></span> Generating AI personalized reminder...
+                </div>
+                <textarea id="remMessageText" class="form-control" rows="5" style="display: none;"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer flex-between">
+            <button type="button" class="btn btn-secondary" onclick="closeReminderModal()">Close</button>
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline" onclick="copyReminderText()">📋 Copy Text</button>
+                <a href="#" id="remWhatsappBtn" target="_blank" class="btn btn-success">🟢 Send via WhatsApp</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentReminderCid = null;
+    let currentReminderMobile = null;
+
+    function generateAiCustomerSummary(cid) {
+        const card = document.getElementById('aiSummaryCard');
+        const loader = document.getElementById('aiSummaryLoader');
+        const content = document.getElementById('aiSummaryContent');
+
+        card.style.display = 'block';
+        loader.style.display = 'block';
+        content.style.display = 'none';
+
+        fetch('/ai/customer-summary', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({customer_id: cid})
+        })
+        .then(res => res.json())
+        .then(data => {
+            loader.style.display = 'none';
+            content.style.display = 'block';
+            content.innerHTML = '<p>' + (data.summary || 'Summary unavailable.') + '</p>';
+        })
+        .catch(err => {
+            loader.style.display = 'none';
+            content.style.display = 'block';
+            content.innerHTML = '<p class="text-danger">Failed to generate AI summary. Please check internet connection or GEMINI_API_KEY.</p>';
+        });
+    }
+
+    function openReminderModal(cid, name, balance, mobile) {
+        currentReminderCid = cid;
+        currentReminderMobile = mobile;
+        document.getElementById('remCustId').textContent = cid;
+        document.getElementById('remCustName').textContent = name;
+        document.getElementById('remCustBalance').textContent = Number(balance).toLocaleString('en-IN', {minimumFractionDigits: 2});
+        document.getElementById('reminderModal').style.display = 'flex';
+        regenerateReminder();
+    }
+
+    function closeReminderModal() {
+        document.getElementById('reminderModal').style.display = 'none';
+    }
+
+    function regenerateReminder() {
+        const tone = document.querySelector('input[name="remTone"]:checked').value;
+        const loader = document.getElementById('remLoader');
+        const textarea = document.getElementById('remMessageText');
+
+        loader.style.display = 'block';
+        textarea.style.display = 'none';
+
+        fetch('/ai/generate-reminder', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({customer_id: currentReminderCid, tone: tone})
+        })
+        .then(res => res.json())
+        .then(data => {
+            loader.style.display = 'none';
+            textarea.style.display = 'block';
+            textarea.value = data.message || '';
+            updateWhatsappLink();
+        })
+        .catch(err => {
+            loader.style.display = 'none';
+            textarea.style.display = 'block';
+            textarea.value = "Hello, this is a reminder regarding your outstanding Udhaar balance of ₹" + document.getElementById('remCustBalance').textContent + " at {{ shop_name }}. Please clear at your convenience.";
+            updateWhatsappLink();
+        });
+    }
+
+    function updateWhatsappLink() {
+        const text = encodeURIComponent(document.getElementById('remMessageText').value);
+        const mobile = currentReminderMobile ? currentReminderMobile.replace(/\D/g, '') : '';
+        const btn = document.getElementById('remWhatsappBtn');
+        if (mobile && mobile.length >= 10) {
+            btn.href = `https://wa.me/91${mobile}?text=${text}`;
+            btn.style.display = 'inline-flex';
+        } else {
+            btn.href = `https://wa.me/?text=${text}`;
+            btn.style.display = 'inline-flex';
+        }
+    }
+
+    function copyReminderText() {
+        const text = document.getElementById('remMessageText').value;
+        navigator.clipboard.writeText(text).then(() => {
+            showToast('Reminder message copied to clipboard!', 'success');
+        });
+    }
+</script>
+{% endblock %}

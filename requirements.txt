@@ -1,0 +1,6 @@
+Flask==3.0.3
+mysql-connector-python==8.4.0
+google-genai==2.4.0
+reportlab==4.2.0
+python-dotenv==1.0.1
+Werkzeug==3.0.3

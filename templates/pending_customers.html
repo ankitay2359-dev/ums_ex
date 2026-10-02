@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+
+{% block title %}Pending Customers - Udhaar Management System{% endblock %}
+{% block page_title %}Pending Customers & Overdue Accounts{% endblock %}
+
+{% block content %}
+<div class="pending-page-container">
+    <!-- Top Summary Banner -->
+    <div class="pending-summary-card mb-4">
+        <div class="pending-metric">
+            <span class="metric-title">Total Outstanding Market Credit</span>
+            <h2 class="metric-amount">₹{{ "{:,.2f}".format(total_pending_balance) }}</h2>
+            <span class="metric-desc">Total unpaid Udhaar across all customers</span>
+        </div>
+        <div class="pending-counts">
+            <div class="count-pill pill-amber">
+                <span class="count-icon">⏳</span>
+                <span><b>{{ pending_list|length }}</b> Customers Pending</span>
+            </div>
+            <div class="count-pill pill-crimson">
+                <span class="count-icon">🚨</span>
+                <span><b>{{ pending_list|selectattr('status', 'equalto', 'Overdue')|list|length }}</b> Overdue Accounts</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="page-action-header mb-3">
+        <div class="search-box-wrap">
+            <input type="text" id="pendingFilterInput" class="form-control" placeholder="Search by ID, Customer Name or Mobile..." onkeyup="filterPendingTable()">
+            <span class="search-icon">🔍</span>
+        </div>
+        <div class="status-filter-pills">
+            <button type="button" class="btn btn-sm btn-outline active" onclick="filterByStatus('all', this)">All ({{ pending_list|length }})</button>
+            <button type="button" class="btn btn-sm btn-danger-outline" onclick="filterByStatus('Overdue', this)">
+                Overdue ({{ pending_list|selectattr('status', 'equalto', 'Overdue')|list|length }})
+            </button>
+            <button type="button" class="btn btn-sm btn-warning-outline" onclick="filterByStatus('Pending', this)">
+                Pending ({{ pending_list|selectattr('status', 'equalto', 'Pending')|list|length }})
+            </button>
+        </div>
+    </div>
+
+    <!-- Pending Customers Table -->
+    <div class="card">
+        <div class="card-header flex-between">
+            <h3 class="card-title">Customers With Outstanding Balances</h3>
+            <span class="text-muted text-sm">Sorted by Highest Remaining Balance</span>
+        </div>
+        <div class="card-body p-0">
+            {% if pending_list %}
+            <div class="table-responsive">
+                <table class="table table-hover" id="pendingCustomersTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">Cust ID</th>
+                            <th>Customer Name</th>
+                            <th>Mobile</th>
+                            <th class="text-right">Total Udhaar</th>
+                            <th class="text-right">Total Paid</th>
+                            <th class="text-right">Remaining Balance</th>
+                            <th>Latest Due Date</th>
+                            <th class="text-center" style="width: 100px;">Status</th>
+                            <th class="text-center" style="width: 190px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in pending_list %}
+                        <tr class="pending-row" data-status="{{ c.status }}" data-search="{{ c.customer_id }} {{ c.customer_name|lower }} {{ c.mobile or '' }}">
+                            <td><span class="badge badge-dark">#{{ c.customer_id }}</span></td>
+                            <td>
+                                <a href="{{ url_for('customer_details', customer_id=c.customer_id) }}" class="customer-link">
+                                    <b>{{ c.customer_name }}</b>
+                                </a>
+                            </td>
+                            <td>
+                                {% if c.mobile %}
+                                <a href="tel:{{ c.mobile }}">📞 {{ c.mobile }}</a>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-right text-muted">₹{{ "{:,.2f}".format(c.total_udhaar) }}</td>
+                            <td class="text-right text-success">₹{{ "{:,.2f}".format(c.total_paid) }}</td>
+                            <td class="text-right text-bold text-danger">₹{{ "{:,.2f}".format(c.remaining_balance) }}</td>
+                            <td>
+                                {% if c.max_due_date %}
+                                    <span class="{% if c.status == 'Overdue' %}text-danger font-bold{% else %}text-muted{% endif %}">
+                                        {{ c.max_due_date }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">Not specified</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if c.status == 'Overdue' %}
+                                    <span class="badge badge-danger">🚨 Overdue</span>
+                                {% else %}
+                                    <span class="badge badge-warning">⏳ Pending</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group">
+                                    <a href="{{ url_for('payments', customer_id=c.customer_id) }}" class="btn btn-xs btn-success" title="Record payment">
+                                        + Pay
+                                    </a>
+                                    <a href="{{ url_for('customer_details', customer_id=c.customer_id) }}" class="btn btn-xs btn-outline" title="View details">
+                                        Ledger
+                                    </a>
+                                    <button type="button" class="btn btn-xs btn-warning-outline" 
+                                            onclick="openPendingReminder({{ c.customer_id }}, '{{ c.customer_name|escape }}', {{ c.remaining_balance }}, '{{ c.mobile or '' }}')" 
+                                            title="AI Reminder">
+                                        💬 Remind
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state py-5">
+                <span class="empty-icon">🎉</span>
+                <p class="empty-text">No pending customers! All credit has been fully settled.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Quick Reminder for Pending Customer -->
+<div class="modal-overlay" id="quickReminderModal" style="display: none;">
+    <div class="modal-box modal-lg">
+        <div class="modal-header">
+            <h3 class="modal-title">💬 Send Payment Reminder</h3>
+            <button class="modal-close" onclick="closeQuickReminder()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Customer: <b id="qRemName"></b> | Balance: <b class="text-danger">₹<span id="qRemBal"></span></b></p>
+            <div class="form-group">
+                <label class="form-label">Message Tone:</label>
+                <div class="tone-selector">
+                    <label class="radio-label">
+                        <input type="radio" name="qTone" value="polite" checked onchange="loadQuickReminder()">
+                        <span>Polite</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="qTone" value="formal" onchange="loadQuickReminder()">
+                        <span>Formal</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="qTone" value="firm" onchange="loadQuickReminder()">
+                        <span>Firm (Urgent)</span>
+                    </label>
+                </div>
+            </div>
+            <div id="qRemLoader" class="text-center py-3">
+                <span class="spinner"></span> Generating personalized AI message...
+            </div>
+            <textarea id="qRemText" class="form-control" rows="4" style="display: none;"></textarea>
+        </div>
+        <div class="modal-footer flex-between">
+            <button type="button" class="btn btn-secondary" onclick="closeQuickReminder()">Cancel</button>
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline" onclick="copyQText()">📋 Copy</button>
+                <a href="#" id="qRemWhatsapp" target="_blank" class="btn btn-success">🟢 WhatsApp</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let activePendingCid = null;
+    let activePendingMobile = null;
+
+    function filterPendingTable() {
+        const query = document.getElementById('pendingFilterInput').value.toLowerCase();
+        const rows = document.querySelectorAll('.pending-row');
+        rows.forEach(r => {
+            const text = r.getAttribute('data-search');
+            r.style.display = text.includes(query) ? '' : 'none';
+        });
+    }
+
+    function filterByStatus(status, btn) {
+        document.querySelectorAll('.status-filter-pills button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const rows = document.querySelectorAll('.pending-row');
+        rows.forEach(r => {
+            if (status === 'all' || r.getAttribute('data-status') === status) {
+                r.style.display = '';
+            } else {
+                r.style.display = 'none';
+            }
+        });
+    }
+
+    function openPendingReminder(cid, name, bal, mobile) {
+        activePendingCid = cid;
+        activePendingMobile = mobile;
+        document.getElementById('qRemName').textContent = name;
+        document.getElementById('qRemBal').textContent = Number(bal).toLocaleString('en-IN', {minimumFractionDigits: 2});
+        document.getElementById('quickReminderModal').style.display = 'flex';
+        loadQuickReminder();
+    }
+
+    function closeQuickReminder() {
+        document.getElementById('quickReminderModal').style.display = 'none';
+    }
+
+    function loadQuickReminder() {
+        const tone = document.querySelector('input[name="qTone"]:checked').value;
+        const loader = document.getElementById('qRemLoader');
+        const textarea = document.getElementById('qRemText');
+        loader.style.display = 'block';
+        textarea.style.display = 'none';
+
+        fetch('/ai/generate-reminder', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({customer_id: activePendingCid, tone: tone})
+        })
+        .then(res => res.json())
+        .then(data => {
+            loader.style.display = 'none';
+            textarea.style.display = 'block';
+            textarea.value = data.message || '';
+            const mobile = activePendingMobile ? activePendingMobile.replace(/\D/g, '') : '';
+            const enc = encodeURIComponent(textarea.value);
+            document.getElementById('qRemWhatsapp').href = mobile.length >= 10 ? `https://wa.me/91${mobile}?text=${enc}` : `https://wa.me/?text=${enc}`;
+        })
+        .catch(err => {
+            loader.style.display = 'none';
+            textarea.style.display = 'block';
+            textarea.value = `Dear Customer, this is a reminder from {{ shop_name }} regarding pending Udhaar balance of ₹${document.getElementById('qRemBal').textContent}. Kindly settle at your earliest.`;
+        });
+    }
+
+    function copyQText() {
+        const text = document.getElementById('qRemText').value;
+        navigator.clipboard.writeText(text).then(() => {
+            showToast('Reminder copied to clipboard!', 'success');
+        });
+    }
+</script>
+{% endblock %}

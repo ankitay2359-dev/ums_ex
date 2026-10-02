@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Udhaar Management System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="login-body">
+    <div class="login-wrapper">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-logo-circle">🏪</div>
+                <h1 class="login-shop-title">{{ shop_name }}</h1>
+                <p class="login-subtext">Retail Credit & Udhaar Management System</p>
+            </div>
+
+            {% if error %}
+            <div class="alert alert-danger">
+                <span class="alert-icon">⚠</span>
+                <span class="alert-content">{{ error }}</span>
+            </div>
+            {% endif %}
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        <span class="alert-icon">ℹ</span>
+                        <span class="alert-content">{{ message }}</span>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form action="{{ url_for('login') }}" method="POST" class="login-form">
+                <div class="form-group">
+                    <label for="username" class="form-label">Username</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">👤</span>
+                        <input type="text" id="username" name="username" class="form-control" placeholder="Enter admin username" required autofocus autocomplete="username">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">🔒</span>
+                        <input type="password" id="password" name="password" class="form-control" placeholder="Enter admin password" required autocomplete="current-password">
+                    </div>
+                </div>
+
+                <div class="login-actions">
+                    <button type="submit" class="btn btn-primary btn-block btn-lg">
+                        <span>Sign In to Shop Ledger</span>
+                        <span class="btn-arrow">→</span>
+                    </button>
+                </div>
+            </form>
+
+            <div class="login-footer">
+                <div class="demo-credentials-badge">
+                    <strong>Default Dev Credentials:</strong>
+                    <span>Username: <code>admin</code> | Password: <code>admin123</code></span>
+                </div>
+                <p class="login-help-text">Protected by session authentication & encrypted hashing.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block title %}Search Customers - Udhaar Management System{% endblock %}
+{% block page_title %}Dedicated Customer Search{% endblock %}
+
+{% block content %}
+<div class="search-page-container">
+    <!-- Search Query Bar -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form action="{{ url_for('customer_search') }}" method="GET" class="search-form-row">
+                <div class="search-input-group">
+                    <span class="search-prefix-icon">🔎</span>
+                    <input type="text" name="q" id="searchQueryInput" class="form-control form-control-lg" 
+                           placeholder="Search by Customer ID (e.g. 1, 2), Name (e.g. Ankita, Rahul), or Mobile (e.g. 987654)..." 
+                           value="{{ query }}" autofocus autocomplete="off">
+                    <button type="submit" class="btn btn-primary btn-lg">Search</button>
+                    {% if query %}
+                    <a href="{{ url_for('customer_search') }}" class="btn btn-secondary btn-lg">Clear</a>
+                    {% endif %}
+                </div>
+            </form>
+            <div class="search-tips">
+                <span>💡 <b>Search Tips:</b> Enter an ID like <code>1</code> for exact match, a name like <code>Ankita</code> to see all matching customers, or digits of a mobile number.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Results Section -->
+    {% if query %}
+    <div class="card">
+        <div class="card-header flex-between">
+            <div>
+                <h3 class="card-title">Search Results for "{{ query }}"</h3>
+                <span class="card-subtitle">{{ results|length }} customer(s) found</span>
+            </div>
+            {% if results|length > 1 %}
+            <span class="badge badge-warning">Multiple matches found &mdash; select by Customer ID</span>
+            {% endif %}
+        </div>
+        <div class="card-body p-0">
+            {% if results %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th style="width: 100px;">Customer ID</th>
+                            <th>Customer Name</th>
+                            <th>Mobile Number</th>
+                            <th>Address / Landmark</th>
+                            <th>Registration Date</th>
+                            <th class="text-right">Total Udhaar</th>
+                            <th class="text-right">Total Paid</th>
+                            <th class="text-right">Remaining Balance</th>
+                            <th class="text-center" style="width: 140px;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in results %}
+                        <tr>
+                            <td>
+                                <span class="badge badge-dark">#{{ c.customer_id }}</span>
+                            </td>
+                            <td>
+                                <b>{{ c.customer_name }}</b>
+                                {% if query|lower in c.customer_name|lower %}
+                                <span class="match-highlight">Matched</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if c.mobile %}
+                                <span>📞 {{ c.mobile }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ c.address or '<span class="text-muted">No address registered</span>'|safe }}</td>
+                            <td><small class="text-muted">{{ c.registration_date }}</small></td>
+                            <td class="text-right text-danger">₹{{ "{:,.2f}".format(c.total_udhaar) }}</td>
+                            <td class="text-right text-success">₹{{ "{:,.2f}".format(c.total_paid) }}</td>
+                            <td class="text-right text-bold {% if c.balance > 0 %}text-danger{% else %}text-muted{% endif %}">
+                                ₹{{ "{:,.2f}".format(c.balance) }}
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ url_for('customer_details', customer_id=c.customer_id) }}" class="btn btn-sm btn-primary">
+                                    View Details &rarr;
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state py-5">
+                <span class="empty-icon">🔍</span>
+                <p class="empty-text">No customer matched "<b>{{ query }}</b>".</p>
+                <div class="mt-3">
+                    <a href="{{ url_for('customers') }}" class="btn btn-primary btn-sm">+ Add New Customer</a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <!-- Initial Search Prompt State -->
+    <div class="card p-5 text-center">
+        <div class="search-placeholder">
+            <span class="placeholder-icon">🔎</span>
+            <h3>Quick & Precise Customer Lookup</h3>
+            <p class="text-muted max-w-lg mx-auto">
+                Easily look up customer balances and ledgers. Try searching for "<b>Ankita</b>" to view both Customer #1 and Customer #2 separately, or enter a customer's registered phone number.
+            </p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

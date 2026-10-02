@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Udhaar Management System{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    {% block head %}{% endblock %}
+</head>
+<body class="app-body">
+    <!-- App Layout Container -->
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar" id="appSidebar">
+            <div class="sidebar-header">
+                <div class="shop-badge">
+                    <span class="shop-icon">🏪</span>
+                    <div class="shop-meta">
+                        <h2 class="shop-name-title">{{ shop_name }}</h2>
+                        <span class="shop-tagline">Credit & Ledger System</span>
+                    </div>
+                </div>
+                <button class="mobile-close-btn" id="sidebarCloseBtn" aria-label="Close Sidebar">&times;</button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <span class="nav-icon">🏠</span>
+                    <span class="nav-label">Dashboard</span>
+                </a>
+                <a href="{{ url_for('customers') }}" class="nav-item {% if request.endpoint in ['customers', 'customer_details'] %}active{% endif %}">
+                    <span class="nav-icon">👥</span>
+                    <span class="nav-label">Customers</span>
+                </a>
+                <a href="{{ url_for('customer_search') }}" class="nav-item {% if request.endpoint == 'customer_search' %}active{% endif %}">
+                    <span class="nav-icon">🔎</span>
+                    <span class="nav-label">Customer Search</span>
+                </a>
+                <a href="{{ url_for('udhaar') }}" class="nav-item {% if request.endpoint == 'udhaar' %}active{% endif %}">
+                    <span class="nav-icon">💰</span>
+                    <span class="nav-label">Udhaar</span>
+                </a>
+                <a href="{{ url_for('payments') }}" class="nav-item {% if request.endpoint == 'payments' %}active{% endif %}">
+                    <span class="nav-icon">💵</span>
+                    <span class="nav-label">Payments</span>
+                </a>
+                <a href="{{ url_for('pending_customers') }}" class="nav-item {% if request.endpoint == 'pending_customers' %}active{% endif %}">
+                    <span class="nav-icon">⏳</span>
+                    <span class="nav-label">Pending Customers</span>
+                </a>
+                <a href="{{ url_for('reports') }}" class="nav-item {% if request.endpoint == 'reports' %}active{% endif %}">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-label">Reports</span>
+                </a>
+                <a href="{{ url_for('ai_assistant') }}" class="nav-item {% if request.endpoint == 'ai_assistant' %}active{% endif %}">
+                    <span class="nav-icon">🤖</span>
+                    <span class="nav-label">AI Assistant</span>
+                    <span class="ai-sparkle-pill">Smart</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar">{{ current_admin[0]|upper if current_admin else 'A' }}</div>
+                    <div class="user-details">
+                        <span class="user-name">{{ current_admin or 'Administrator' }}</span>
+                        <span class="user-role">Shop Manager</span>
+                    </div>
+                </div>
+                <form action="{{ url_for('logout') }}" method="POST" class="logout-form">
+                    <button type="submit" class="logout-btn" title="Logout from system">
+                        <span class="logout-icon">🚪</span>
+                        <span class="logout-text">Logout</span>
+                    </button>
+                </form>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="main-wrapper">
+            <!-- Top Header Bar -->
+            <header class="top-header">
+                <div class="header-left">
+                    <button class="mobile-toggle-btn" id="sidebarToggleBtn" aria-label="Toggle Menu">☰</button>
+                    <div class="header-title-wrapper">
+                        <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+                        <span class="current-date" id="liveDateDisplay"></span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="quick-stats-pill">
+                        <span class="dot-online"></span>
+                        <span class="pill-text">Shop Active</span>
+                    </div>
+                    <a href="{{ url_for('udhaar') }}" class="btn btn-sm btn-primary-outline">+ Add Udhaar</a>
+                    <a href="{{ url_for('payments') }}" class="btn btn-sm btn-success-outline">+ Add Payment</a>
+                </div>
+            </header>
+
+            <!-- Flash Notification Alerts -->
+            <div class="flash-messages-container" id="toastContainer">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} fade-in">
+                                <span class="alert-icon">
+                                    {% if category == 'success' %}✓{% elif category == 'danger' %}⚠{% elif category == 'warning' %}!{% else %}ℹ{% endif %}
+                                </span>
+                                <span class="alert-content">{{ message }}</span>
+                                <button type="button" class="alert-close" onclick="this.parentElement.remove()">&times;</button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <!-- Page Body Content -->
+            <main class="page-content">
+                {% block content %}{% endblock %}
+            </main>
+
+            <!-- Bottom Application Footer -->
+            <footer class="app-footer">
+                <p>&copy; {{ current_year }} {{ shop_name }} | Designed for Retail Shop Udhaar Management</p>
+                <div class="footer-links">
+                    <span>Help & Contact: {{ shop_phone }}</span>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Universal Confirmation Modal -->
+    <div class="modal-overlay" id="confirmModal" style="display: none;">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 class="modal-title" id="confirmModalTitle">Confirm Action</h3>
+                <button class="modal-close" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="confirmModalBody">
+                Are you sure you want to proceed?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmModalActionBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

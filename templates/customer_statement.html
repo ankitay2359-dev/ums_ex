@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statement - {{ data.customer.customer_name }} (#{{ data.customer.customer_id }})</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #f1f5f9; padding: 20px; font-family: 'Inter', sans-serif; }
+        .statement-sheet {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        @media print {
+            body { background: #fff; padding: 0; }
+            .statement-sheet { box-shadow: none; padding: 0; width: 100%; max-width: 100%; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Action Bar -->
+    <div class="no-print" style="max-width: 800px; margin: 0 auto 15px auto; display: flex; justify-content: space-between; align-items: center;">
+        <a href="{{ url_for('customer_details', customer_id=data.customer.customer_id) }}" class="btn btn-secondary">
+            &larr; Back to Profile
+        </a>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="window.print()" class="btn btn-outline">🖨️ Print Statement</button>
+            <a href="{{ url_for('customer_statement_pdf', customer_id=data.customer.customer_id) }}" class="btn btn-primary">
+                📄 Download Official PDF
+            </a>
+        </div>
+    </div>
+
+    <!-- Statement Document Sheet -->
+    <div class="statement-sheet">
+        <!-- Shop Header -->
+        <div style="text-align: center; border-bottom: 2px solid #2563EB; padding-bottom: 15px; margin-bottom: 20px;">
+            <h1 style="margin: 0; font-size: 24px; color: #1E293B;">{{ shop_name }}</h1>
+            <p style="margin: 5px 0; color: #64748B; font-size: 13px;">{{ shop_address }} | Phone: {{ shop_phone }}</p>
+            <h3 style="margin: 10px 0 0 0; color: #2563EB; font-size: 16px; text-transform: uppercase; letter-spacing: 0.5px;">Customer Account & Udhaar Statement</h3>
+        </div>
+
+        <!-- Customer & Statement Meta Box -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; background: #F8FAFC; border: 1px solid #CBD5E1; padding: 15px; border-radius: 6px; margin-bottom: 25px;">
+            <div>
+                <p style="margin: 3px 0;"><strong>Customer ID:</strong> #{{ data.customer.customer_id }}</p>
+                <p style="margin: 3px 0;"><strong>Customer Name:</strong> {{ data.customer.customer_name }}</p>
+                <p style="margin: 3px 0;"><strong>Mobile:</strong> {{ data.customer.mobile or 'N/A' }}</p>
+            </div>
+            <div>
+                <p style="margin: 3px 0;"><strong>Address:</strong> {{ data.customer.address or 'N/A' }}</p>
+                <p style="margin: 3px 0;"><strong>Registration Date:</strong> {{ data.customer.registration_date }}</p>
+                <p style="margin: 3px 0;"><strong>Statement Generated:</strong> {{ current_year }}-10-02</p>
+            </div>
+        </div>
+
+        <!-- Financial Summary Row -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 25px;">
+            <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 6px; padding: 12px; text-align: center;">
+                <span style="font-size: 11px; color: #991B1B; font-weight: 600; text-transform: uppercase;">Total Udhaar (Credit)</span>
+                <h3 style="margin: 5px 0 0 0; color: #DC2626; font-size: 18px;">₹{{ "{:,.2f}".format(data.total_udhaar) }}</h3>
+            </div>
+            <div style="background: #F0FDF4; border: 1px solid #86EFAC; border-radius: 6px; padding: 12px; text-align: center;">
+                <span style="font-size: 11px; color: #166534; font-weight: 600; text-transform: uppercase;">Total Payments</span>
+                <h3 style="margin: 5px 0 0 0; color: #16A34A; font-size: 18px;">₹{{ "{:,.2f}".format(data.total_paid) }}</h3>
+            </div>
+            <div style="background: #FEFCE8; border: 1px solid #FDE047; border-radius: 6px; padding: 12px; text-align: center;">
+                <span style="font-size: 11px; color: #854D0E; font-weight: 600; text-transform: uppercase;">Remaining Balance</span>
+                <h3 style="margin: 5px 0 0 0; color: {% if data.remaining_balance > 0 %}#DC2626{% else %}#16A34A{% endif %}; font-size: 18px;">
+                    ₹{{ "{:,.2f}".format(data.remaining_balance) }}
+                </h3>
+            </div>
+        </div>
+
+        <!-- Udhaar History Table -->
+        <h4 style="margin: 20px 0 10px 0; color: #1E293B; border-bottom: 1px solid #E2E8F0; padding-bottom: 5px;">Udhaar (Credit) Transactions</h4>
+        <table class="table table-bordered mb-4" style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <thead>
+                <tr style="background: #F1F5F9;">
+                    <th style="padding: 6px; border: 1px solid #CBD5E1;">ID</th>
+                    <th style="padding: 6px; border: 1px solid #CBD5E1;">Date</th>
+                    <th style="padding: 6px; border: 1px solid #CBD5E1;">Product Description</th>
+                    <th style="padding: 6px; border: 1px solid #CBD5E1;">Qty</th>
+                    <th style="padding: 6px; border: 1px solid #CBD5E1;">Due Date</th>
+                    <th style="padding: 6px; border: 1px solid #CBD5E1; text-align: right;">Amount (₹)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if data.udhaar_records %}
+                    {% for u in data.udhaar_records %}
+                    <tr>
+                        <td style="padding: 6px; border: 1px solid #CBD5E1;">#{{ u.udhaar_id }}</td>
+                        <td style="padding: 6px; border: 1px solid #CBD5E1;">{{ u.udhaar_date }}</td>
+                        <td style="padding: 6px; border: 1px solid #CBD5E1;"><b>{{ u.product_name }}</b></td>
+                        <td style="padding: 6px; border: 1px solid #CBD5E1;">{{ u.quantity }}</td>
+                        <td style="padding: 6px; border: 1px solid #CBD5E1;">{{ u.due_date or '-' }}</td>
+                        <td style="padding: 6px; border: 1px solid #CBD5E1; text-align: right; color: #DC2626; font-weight: 600;">
+                            ₹{{ "{:,.2f}".format(u.amount) }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="6" style="padding: 10px; text-align: center; color: #64748B;">No credit transactions recorded.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        <!-- Payment History Table -->
+        <h4 style="margin: 20px 0 10px 0; color: #1E293B; border-bottom: 1px solid #E2E8F0; padding-bottom: 5px;">Payment Receipts</h4>
+        <table class="table table-bordered mb-4" style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <thead>
+                <tr style="background: #F1F5F9;">
+                    <th style="padding: 6px; border: 1px solid #CBD5E1;">Receipt ID</th>
+                    <th style="padding: 6px; border: 1px solid #CBD5E1;">Payment Date</th>
+                    <th style="padding: 6px; border: 1px solid #CBD5E1;">Payment Mode</th>
+                    <th style="padding: 6px; border: 1px solid #CBD5E1;">Notes</th>
+                    <th style="padding: 6px; border: 1px solid #CBD5E1; text-align: right;">Amount Paid (₹)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if data.payment_records %}
+                    {% for p in data.payment_records %}
+                    <tr>
+                        <td style="padding: 6px; border: 1px solid #CBD5E1;">#{{ p.payment_id }}</td>
+                        <td style="padding: 6px; border: 1px solid #CBD5E1;">{{ p.payment_date }}</td>
+                        <td style="padding: 6px; border: 1px solid #CBD5E1;">{{ p.payment_method }}</td>
+                        <td style="padding: 6px; border: 1px solid #CBD5E1;">{{ p.notes or '-' }}</td>
+                        <td style="padding: 6px; border: 1px solid #CBD5E1; text-align: right; color: #16A34A; font-weight: 600;">
+                            ₹{{ "{:,.2f}".format(p.amount_paid) }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" style="padding: 10px; text-align: center; color: #64748B;">No payments recorded yet.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        <!-- Statement Footer -->
+        <div style="border-top: 1px solid #CBD5E1; padding-top: 15px; margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-end;">
+            <div>
+                <p style="margin: 0; font-size: 11px; color: #64748B;">Generated electronically by {{ shop_name }}.</p>
+                <p style="margin: 0; font-size: 11px; color: #64748B;">For inquiries, contact: {{ shop_phone }}</p>
+            </div>
+            <div style="text-align: right;">
+                <p style="margin: 0 0 40px 0; font-size: 11px; color: #64748B;">Authorized Shopkeeper Signature</p>
+                <div style="border-bottom: 1px solid #000; width: 180px; display: inline-block;"></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

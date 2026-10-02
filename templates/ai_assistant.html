@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}AI Shop Assistant - Udhaar Management System{% endblock %}
+{% block page_title %}AI Shop Assistant & Financial Copilot{% endblock %}
+
+{% block content %}
+<div class="ai-assistant-container">
+    <!-- Top AI Safety & Grounding Banner -->
+    <div class="ai-safety-banner mb-3">
+        <div class="banner-icon">🛡️</div>
+        <div class="banner-content">
+            <h4>Grounded Database Architecture & Safety Enforced</h4>
+            <p>Answers are grounded strictly in your live MySQL customer records and ledger tables. AI can search, calculate, summarize, and draft reminders, but is restricted from directly mutating financial records without shopkeeper confirmation.</p>
+        </div>
+        <div class="banner-action">
+            <button type="button" class="btn btn-sm btn-outline" onclick="loadFinancialInsights()">
+                📊 Get Business Insights
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Chat Card -->
+    <div class="card chat-card">
+        <div class="card-header flex-between">
+            <div class="flex-align-center gap-2">
+                <span class="ai-robot-avatar">🤖</span>
+                <div>
+                    <h3 class="card-title">Udhaar AI Chatbot</h3>
+                    <span class="card-subtitle">Natural language customer search, credit balances & accounting answers</span>
+                </div>
+            </div>
+            <button class="btn btn-xs btn-outline" onclick="clearAiChat()">Clear Conversation</button>
+        </div>
+
+        <!-- Chat Conversation Area -->
+        <div class="card-body chat-body" id="chatMessageArea">
+            <!-- Welcome Bot Message -->
+            <div class="chat-message bot-message">
+                <div class="msg-avatar">🤖</div>
+                <div class="msg-bubble">
+                    <p><b>Namaste! I am your AI Shop Assistant for {{ shop_name }}.</b></p>
+                    <p>You can ask me anything about your shop's credit ledgers, customer balances, payments, or ask me to draft payment reminders. Here are some examples you can try:</p>
+                    <div class="chat-chips mt-2">
+                        <button class="prompt-chip" onclick="askAiQuestion('Who has the highest pending balance?')">
+                            🔥 Who has highest pending balance?
+                        </button>
+                        <button class="prompt-chip" onclick="askAiQuestion('How much does Rahul Gupta owe?')">
+                            👤 How much does Rahul Gupta owe?
+                        </button>
+                        <button class="prompt-chip" onclick="askAiQuestion('Show customers named Ankita')">
+                            🔎 Show customers named Ankita
+                        </button>
+                        <button class="prompt-chip" onclick="askAiQuestion('Which customers have overdue payments?')">
+                            🚨 Which accounts are overdue?
+                        </button>
+                        <button class="prompt-chip" onclick="askAiQuestion('Draft a polite payment reminder for Rahul Gupta')">
+                            💬 Draft reminder for Rahul
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Input Form -->
+        <div class="card-footer chat-footer">
+            <form id="aiChatForm" onsubmit="handleAiChatSubmit(event)">
+                <div class="chat-input-row">
+                    <button type="button" class="btn btn-icon btn-mic" id="voiceMicBtn" title="Voice Input (Speech-to-text)" onclick="toggleVoiceInput()">
+                        🎙️
+                    </button>
+                    <input type="text" id="aiChatInput" class="form-control form-control-lg chat-input" 
+                           placeholder="Type a query (e.g. 'How much does customer #3 owe?' or click mic for voice)..." 
+                           autocomplete="off">
+                    <button type="submit" class="btn btn-primary btn-lg chat-send-btn" id="aiSendBtn">
+                        <span>Send</span>
+                        <span>➤</span>
+                    </button>
+                </div>
+            </form>
+            <div class="voice-indicator" id="voiceIndicator" style="display: none;">
+                <span class="pulsing-red-dot"></span> Listening to your voice... Speak now!
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/ai.js') }}"></script>
+{% endblock %}

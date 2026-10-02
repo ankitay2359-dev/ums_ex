@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block title %}Record Udhaar - Udhaar Management System{% endblock %}
+{% block page_title %}Record Udhaar (Credit Transaction){% endblock %}
+
+{% block content %}
+<div class="form-page-layout">
+    <!-- Left Column: Add Udhaar Form -->
+    <div class="form-column">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">📝 New Credit / Udhaar Entry</h3>
+                <span class="card-subtitle">Record item(s) given to customer on credit</span>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('udhaar') }}" method="POST" id="udhaarForm" onsubmit="return validateUdhaarForm()">
+                    <!-- Customer Selector -->
+                    <div class="form-group">
+                        <label for="customer_id" class="form-label">Select Customer <span class="text-danger">*</span></label>
+                        <select name="customer_id" id="customer_id" class="form-control" required onchange="onCustomerSelectChange(this)">
+                            <option value="">-- Choose Customer (ID & Name) --</option>
+                            {% for c in customers %}
+                            <option value="{{ c.customer_id }}" {% if selected_cid == c.customer_id %}selected{% endif %}
+                                    data-balance="{{ c.balance }}">
+                                #{{ c.customer_id }} &mdash; {{ c.customer_name }} {% if c.mobile %}({{ c.mobile }}){% endif %} - Cur. Bal: ₹{{ "{:,.2f}".format(c.balance) }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div id="customerQuickBalance" class="form-hint-info" style="display: none;"></div>
+                    </div>
+
+                    <!-- Product Name -->
+                    <div class="form-group">
+                        <label for="product_name" class="form-label">Product / Items Description <span class="text-danger">*</span></label>
+                        <input type="text" name="product_name" id="product_name" class="form-control" 
+                               placeholder="e.g. Basmati Rice, Mustard Oil, 2 Packets Detergent..." required>
+                    </div>
+
+                    <!-- Quantity & Amount Row -->
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="quantity" class="form-label">Quantity / Unit</label>
+                            <input type="text" name="quantity" id="quantity" class="form-control" 
+                                   placeholder="e.g. 5kg, 2 litres, 3 packets, 1 box" value="1">
+                            <small class="form-hint">Accepts free-form units like '5kg', '2L'</small>
+                        </div>
+
+                        <div class="form-group col-md-6">
+                            <label for="amount" class="form-label">Total Amount (₹) <span class="text-danger">*</span></label>
+                            <div class="input-wrapper">
+                                <span class="input-currency">₹</span>
+                                <input type="number" step="0.01" min="0.5" name="amount" id="amount" class="form-control" 
+                                       placeholder="0.00" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Date & Due Date Row -->
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="udhaar_date" class="form-label">Transaction Date <span class="text-danger">*</span></label>
+                            <input type="date" name="udhaar_date" id="udhaar_date" class="form-control" required>
+                        </div>
+
+                        <div class="form-group col-md-6">
+                            <label for="due_date" class="form-label">Promise / Due Date (Optional)</label>
+                            <input type="date" name="due_date" id="due_date" class="form-control">
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="form-group">
+                        <label for="notes" class="form-label">Additional Remarks / Notes</label>
+                        <textarea name="notes" id="notes" class="form-control" rows="2" placeholder="Optional notes (e.g. promised payment after festival, family emergency)"></textarea>
+                    </div>
+
+                    <!-- Submit Actions -->
+                    <div class="form-actions mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg btn-block">
+                            💾 Save Udhaar Record to Database
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Recent Udhaar Transactions -->
+    <div class="table-column">
+        <div class="card">
+            <div class="card-header flex-between">
+                <h3 class="card-title">Recent Udhaar Transactions</h3>
+                <span class="text-muted text-sm">Last 15 records</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th>Product</th>
+                                <th>Qty</th>
+                                <th class="text-right">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if recent %}
+                                {% for r in recent %}
+                                <tr>
+                                    <td><small>{{ r.udhaar_date }}</small></td>
+                                    <td>
+                                        <a href="{{ url_for('customer_details', customer_id=r.customer_id) }}" class="customer-link">
+                                            <b>{{ r.customer_name }}</b>
+                                            <span class="sub-id">#{{ r.customer_id }}</span>
+                                        </a>
+                                    </td>
+                                    <td>{{ r.product_name }}</td>
+                                    <td><span class="badge badge-light">{{ r.quantity }}</span></td>
+                                    <td class="text-right text-bold text-danger">₹{{ "{:,.2f}".format(r.amount) }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">No Udhaar records found.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/udhaar.js') }}"></script>
+<script>
+    // Set default transaction date to today
+    document.addEventListener('DOMContentLoaded', function() {
+        const dateInput = document.getElementById('udhaar_date');
+        if (dateInput && !dateInput.value) {
+            dateInput.value = new Date().toISOString().split('T')[0];
+        }
+    });
+
+    function onCustomerSelectChange(select) {
+        const selected = select.options[select.selectedIndex];
+        const balanceDiv = document.getElementById('customerQuickBalance');
+        if (selected && selected.value) {
+            const bal = parseFloat(selected.getAttribute('data-balance') || 0);
+            balanceDiv.style.display = 'block';
+            balanceDiv.innerHTML = `Current Outstanding Balance for this customer: <b class="${bal > 0 ? 'text-danger' : 'text-success'}">₹${bal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</b>`;
+        } else {
+            balanceDiv.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}

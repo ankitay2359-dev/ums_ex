@@ -1,0 +1,179 @@
+{% extends 'base.html' %}
+
+{% block title %}Customer Management - Udhaar Management System{% endblock %}
+{% block page_title %}Customer Directory & Accounts{% endblock %}
+
+{% block content %}
+<div class="customers-container">
+    <!-- Top Action & Search Bar -->
+    <div class="page-action-header">
+        <div class="search-box-wrap">
+            <input type="text" id="customerTableFilter" class="form-control" placeholder="Quick filter by ID, Name or Mobile..." onkeyup="filterCustomerTable()">
+            <span class="search-icon">🔍</span>
+        </div>
+        <button class="btn btn-primary" onclick="openAddCustomerModal()">
+            <span>+ Add New Customer</span>
+        </button>
+    </div>
+
+    <!-- Customer Statistics Header Bar -->
+    <div class="info-alert-strip">
+        <span>💡 <b>Note on Identity:</b> Customers are identified by their unique <b>Customer ID</b>. Multiple customers can share the same name (e.g. ID #1 Ankita & ID #2 Ankita). Both remain separate ledger entities.</span>
+    </div>
+
+    <!-- Customer Directory Table -->
+    <div class="card">
+        <div class="card-header flex-between">
+            <h3 class="card-title">Registered Customers ({{ customers|length }})</h3>
+            <span class="text-muted text-sm">Sorted by Customer ID</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover" id="customersMainTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">Cust ID</th>
+                            <th>Customer Name</th>
+                            <th>Mobile Number</th>
+                            <th>Address / Location</th>
+                            <th>Reg. Date</th>
+                            <th class="text-right">Total Udhaar</th>
+                            <th class="text-right">Total Paid</th>
+                            <th class="text-right">Outstanding</th>
+                            <th class="text-center" style="width: 170px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if customers %}
+                            {% for c in customers %}
+                            <tr class="customer-row" data-name="{{ c.customer_name|lower }}" data-id="{{ c.customer_id }}" data-mobile="{{ c.mobile or '' }}">
+                                <td>
+                                    <span class="badge badge-dark">#{{ c.customer_id }}</span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('customer_details', customer_id=c.customer_id) }}" class="customer-name-link">
+                                        <b>{{ c.customer_name }}</b>
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if c.mobile %}
+                                    <a href="tel:{{ c.mobile }}" class="phone-link">📞 {{ c.mobile }}</a>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-truncate" style="max-width: 220px;" title="{{ c.address or '' }}">
+                                    {{ c.address or '<span class="text-muted">No address</span>'|safe }}
+                                </td>
+                                <td><small class="text-muted">{{ c.registration_date }}</small></td>
+                                <td class="text-right text-danger">₹{{ "{:,.2f}".format(c.total_udhaar) }}</td>
+                                <td class="text-right text-success">₹{{ "{:,.2f}".format(c.total_paid) }}</td>
+                                <td class="text-right text-bold {% if c.balance > 0 %}text-danger{% else %}text-muted{% endif %}">
+                                    ₹{{ "{:,.2f}".format(c.balance) }}
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group">
+                                        <a href="{{ url_for('customer_details', customer_id=c.customer_id) }}" class="btn btn-xs btn-primary-outline" title="View customer profile & history">
+                                            View
+                                        </a>
+                                        <button type="button" class="btn btn-xs btn-secondary" onclick="openEditModal({{ c.customer_id }}, '{{ c.customer_name|escape }}', '{{ c.mobile or '' }}', '{{ c.address or '' }}')" title="Edit customer">
+                                            ✏️
+                                        </button>
+                                        <button type="button" class="btn btn-xs btn-danger-outline" onclick="confirmDeleteCustomer({{ c.customer_id }}, '{{ c.customer_name|escape }}')" title="Delete customer">
+                                            🗑️
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center py-5">
+                                    <div class="empty-state">
+                                        <span class="empty-icon">👥</span>
+                                        <p class="empty-text">No customers registered yet.</p>
+                                        <button class="btn btn-primary btn-sm" onclick="openAddCustomerModal()">+ Add Your First Customer</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add Customer -->
+<div class="modal-overlay" id="addCustomerModal" style="display: none;">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 class="modal-title">➕ Add New Customer</h3>
+            <button class="modal-close" onclick="closeAddCustomerModal()">&times;</button>
+        </div>
+        <form action="{{ url_for('customers') }}" method="POST" id="addCustomerForm" onsubmit="return validateAddCustomerForm()">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="new_customer_name" class="form-label">Customer Name <span class="text-danger">*</span></label>
+                    <input type="text" id="new_customer_name" name="customer_name" class="form-control" placeholder="e.g. Rahul Gupta, Ankita..." required>
+                    <small class="form-hint">Unique Customer ID will be generated automatically by MySQL.</small>
+                </div>
+                <div class="form-group">
+                    <label for="new_mobile" class="form-label">Mobile Number</label>
+                    <input type="tel" id="new_mobile" name="mobile" class="form-control" placeholder="10-digit mobile number" maxlength="15">
+                </div>
+                <div class="form-group">
+                    <label for="new_address" class="form-label">Shop / Residential Address</label>
+                    <textarea id="new_address" name="address" class="form-control" rows="2" placeholder="Street, locality, landmark..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeAddCustomerModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Customer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Edit Customer -->
+<div class="modal-overlay" id="editCustomerModal" style="display: none;">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 class="modal-title">✏️ Edit Customer Details</h3>
+            <button class="modal-close" onclick="closeEditCustomerModal()">&times;</button>
+        </div>
+        <form id="editCustomerForm" method="POST">
+            <div class="modal-body">
+                <input type="hidden" id="edit_customer_id" name="customer_id">
+                <div class="form-group">
+                    <label class="form-label">Customer ID</label>
+                    <input type="text" id="edit_id_display" class="form-control" disabled readonly>
+                </div>
+                <div class="form-group">
+                    <label for="edit_customer_name" class="form-label">Customer Name <span class="text-danger">*</span></label>
+                    <input type="text" id="edit_customer_name" name="customer_name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit_mobile" class="form-label">Mobile Number</label>
+                    <input type="tel" id="edit_mobile" name="mobile" class="form-control" maxlength="15">
+                </div>
+                <div class="form-group">
+                    <label for="edit_address" class="form-label">Address</label>
+                    <textarea id="edit_address" name="address" class="form-control" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeEditCustomerModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Customer</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Hidden Form -->
+<form id="deleteCustomerForm" method="POST" style="display: none;"></form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/customers.js') }}"></script>
+{% endblock %}

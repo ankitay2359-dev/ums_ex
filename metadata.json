@@ -1,0 +1,9 @@
+{
+  "name": "Udhaar Management System",
+  "description": "Complete retail credit and udhaar management system for shop owners featuring customer ledgers, payment tracking, financial insights, PDF statements, and AI assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
+

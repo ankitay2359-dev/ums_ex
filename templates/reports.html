@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+
+{% block title %}Financial Reports - Udhaar Management System{% endblock %}
+{% block page_title %}Financial & Audit Reports{% endblock %}
+
+{% block content %}
+<div class="reports-container">
+    <!-- Filter Controls Card -->
+    <div class="card mb-4 no-print">
+        <div class="card-header">
+            <h3 class="card-title">🔍 Filter Report Criteria</h3>
+            <span class="card-subtitle">Generate custom transaction and credit statements</span>
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('reports') }}" method="GET" class="filter-form">
+                <div class="form-row">
+                    <div class="form-group col-md-3">
+                        <label for="report_type" class="form-label">Report Category</label>
+                        <select name="report_type" id="report_type" class="form-control">
+                            <option value="all" {% if report_type == 'all' %}selected{% endif %}>All Combined Ledgers</option>
+                            <option value="udhaar" {% if report_type == 'udhaar' %}selected{% endif %}>Udhaar (Credit) Report Only</option>
+                            <option value="payments" {% if report_type == 'payments' %}selected{% endif %}>Payments Received Report Only</option>
+                            <option value="outstanding" {% if report_type == 'outstanding' %}selected{% endif %}>Outstanding Balances Only</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group col-md-3">
+                        <label for="customer_id" class="form-label">Specific Customer</label>
+                        <select name="customer_id" id="customer_id" class="form-control">
+                            <option value="">-- All Customers --</option>
+                            {% for c in customers %}
+                            <option value="{{ c.customer_id }}" {% if selected_cid == c.customer_id %}selected{% endif %}>
+                                #{{ c.customer_id }} &mdash; {{ c.customer_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group col-md-2">
+                        <label for="start_date" class="form-label">From Date</label>
+                        <input type="date" name="start_date" id="start_date" class="form-control" value="{{ start_date }}">
+                    </div>
+
+                    <div class="form-group col-md-2">
+                        <label for="end_date" class="form-label">To Date</label>
+                        <input type="date" name="end_date" id="end_date" class="form-control" value="{{ end_date }}">
+                    </div>
+
+                    <div class="form-group col-md-2 flex-end">
+                        <div class="btn-group w-100">
+                            <button type="submit" class="btn btn-primary w-100">Filter Data</button>
+                            <a href="{{ url_for('reports') }}" class="btn btn-secondary">Reset</a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Print / Export Bar -->
+    <div class="print-actions-bar mb-3 no-print flex-between">
+        <div>
+            <span class="report-meta-text">
+                Generated for: <b>{{ shop_name }}</b> | Showing: <b>{{ report_type|capitalize }}</b> records
+            </span>
+        </div>
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline" onclick="window.print()">
+                🖨️ Print / Save as PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- Printable Report Document Container -->
+    <div class="report-sheet card">
+        <div class="report-sheet-header">
+            <h2>{{ shop_name }}</h2>
+            <p>{{ shop_address }} | Phone: {{ shop_phone }}</p>
+            <h3>OFFICIAL CREDIT & FINANCIAL REPORT</h3>
+            <p class="report-date-stamp">Report Period: {{ start_date or 'Beginning of Records' }} &mdash; {{ end_date or 'Present Date' }}</p>
+            <hr class="report-divider">
+        </div>
+
+        <!-- 1. Udhaar Report Table -->
+        {% if report_type in ['all', 'udhaar'] %}
+        <div class="report-section mb-5">
+            <div class="flex-between mb-2">
+                <h4 class="section-title">💰 Udhaar (Credit Issued) Statement</h4>
+                <span class="badge badge-light">{{ data.udhaar|length }} record(s)</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr class="table-head-bg">
+                            <th>ID</th>
+                            <th>Date</th>
+                            <th>Customer Name</th>
+                            <th>Mobile</th>
+                            <th>Product Description</th>
+                            <th>Quantity</th>
+                            <th class="text-right">Amount (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if data.udhaar %}
+                            {% for u in data.udhaar %}
+                            <tr>
+                                <td>#{{ u.udhaar_id }}</td>
+                                <td>{{ u.udhaar_date }}</td>
+                                <td><b>{{ u.customer_name }}</b> <span class="sub-id">#{{ u.customer_id }}</span></td>
+                                <td>{{ u.mobile or '-' }}</td>
+                                <td>{{ u.product_name }}</td>
+                                <td>{{ u.quantity }}</td>
+                                <td class="text-right text-bold">₹{{ "{:,.2f}".format(u.amount) }}</td>
+                            </tr>
+                            {% endfor %}
+                            <tr class="table-total-row">
+                                <td colspan="6" class="text-right text-bold">Subtotal Udhaar Given:</td>
+                                <td class="text-right text-bold text-danger">
+                                    ₹{{ "{:,.2f}".format(data.udhaar|sum(attribute='amount')) }}
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center py-3 text-muted">No Udhaar records matched filter criteria.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 2. Payments Report Table -->
+        {% if report_type in ['all', 'payments'] %}
+        <div class="report-section mb-5">
+            <div class="flex-between mb-2">
+                <h4 class="section-title">💵 Payment Receipts Statement</h4>
+                <span class="badge badge-light">{{ data.payments|length }} record(s)</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr class="table-head-bg">
+                            <th>Receipt ID</th>
+                            <th>Date</th>
+                            <th>Customer Name</th>
+                            <th>Payment Mode</th>
+                            <th>Remarks / Reference</th>
+                            <th class="text-right">Amount Received (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if data.payments %}
+                            {% for p in data.payments %}
+                            <tr>
+                                <td>#{{ p.payment_id }}</td>
+                                <td>{{ p.payment_date }}</td>
+                                <td><b>{{ p.customer_name }}</b> <span class="sub-id">#{{ p.customer_id }}</span></td>
+                                <td><span class="badge badge-primary">{{ p.payment_method }}</span></td>
+                                <td>{{ p.notes or '-' }}</td>
+                                <td class="text-right text-bold text-success">₹{{ "{:,.2f}".format(p.amount_paid) }}</td>
+                            </tr>
+                            {% endfor %}
+                            <tr class="table-total-row">
+                                <td colspan="5" class="text-right text-bold">Subtotal Payments Collected:</td>
+                                <td class="text-right text-bold text-success">
+                                    ₹{{ "{:,.2f}".format(data.payments|sum(attribute='amount_paid')) }}
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center py-3 text-muted">No payment records matched filter criteria.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 3. Outstanding Balances Report Table -->
+        {% if report_type in ['all', 'outstanding'] %}
+        <div class="report-section mb-3">
+            <div class="flex-between mb-2">
+                <h4 class="section-title">⚖️ Outstanding Market Credit Balances</h4>
+                <span class="badge badge-light">{{ data.outstanding|length }} customer(s) pending</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr class="table-head-bg">
+                            <th>Cust ID</th>
+                            <th>Customer Name</th>
+                            <th>Mobile</th>
+                            <th class="text-right">Total Udhaar Taken</th>
+                            <th class="text-right">Total Payments Made</th>
+                            <th class="text-right">Remaining Balance (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if data.outstanding %}
+                            {% for o in data.outstanding %}
+                            <tr>
+                                <td>#{{ o.customer_id }}</td>
+                                <td><b>{{ o.customer_name }}</b></td>
+                                <td>{{ o.mobile or '-' }}</td>
+                                <td class="text-right">₹{{ "{:,.2f}".format(o.total_udhaar) }}</td>
+                                <td class="text-right text-success">₹{{ "{:,.2f}".format(o.total_paid) }}</td>
+                                <td class="text-right text-bold text-danger">₹{{ "{:,.2f}".format(o.remaining_balance) }}</td>
+                            </tr>
+                            {% endfor %}
+                            <tr class="table-total-row">
+                                <td colspan="5" class="text-right text-bold">Total Net Uncollected Credit:</td>
+                                <td class="text-right text-bold text-danger">
+                                    ₹{{ "{:,.2f}".format(data.outstanding|sum(attribute='remaining_balance')) }}
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center py-3 text-muted">No outstanding balances.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="report-footer text-center mt-4">
+            <hr>
+            <small class="text-muted">Report generated on {{ current_year }} by {{ shop_name }} Udhaar System.</small>
+        </div>
+    </div>
+</div>
+{% endblock %}
